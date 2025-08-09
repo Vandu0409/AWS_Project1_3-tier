@@ -1,64 +1,66 @@
-const dbcreds = require('./DbConfig');
-const mysql = require('mysql');
+// TransactionService.js
+const { Pool } = require('pg');
 
-const con = mysql.createConnection({
-    host: dbcreds.DB_HOST,
-    user: dbcreds.DB_USER,
-    password: dbcreds.DB_PWD,
-    database: dbcreds.DB_DATABASE
+// Create a connection pool to PostgreSQL RDS
+const pool = new Pool({
+    host: 'my-rds.chwoe4yo8i3j.ap-south-1.rds.amazonaws.com', // RDS endpoint
+    user: 'postgres',   // DB username
+    password: 'your_password', // DB password
+    database: 'postgres',  // DB name
+    port: 5432
 });
 
-function addTransaction(amount,desc){
-    var mysql = `INSERT INTO \`transactions\` (\`amount\`, \`description\`) VALUES ('${amount}','${desc}')`;
-    con.query(mysql, function(err,result){
-        if (err) throw err;
-        console.log("Adding to the table should have worked");
-    }) 
-    return 200;
-}
+module.exports = {
+    addTransaction: async (amount, desc) => {
+        try {
+            const result = await pool.query(
+                'INSERT INTO transactions (amount, description) VALUES ($1, $2) RETURNING id',
+                [amount, desc]
+            );
+            return 200;
+        } catch (err) {
+            console.error('Error adding transaction:', err);
+            throw err;
+        }
+    },
 
-function getAllTransactions(callback){
-    var mysql = "SELECT * FROM transactions";
-    con.query(mysql, function(err,result){
-        if (err) throw err;
-        console.log("Getting all transactions...");
-        return(callback(result));
-    });
-}
+    getAllTransactions: async (callback) => {
+        try {
+            const result = await pool.query('SELECT * FROM transactions');
+            callback(result.rows);
+        } catch (err) {
+            console.error('Error fetching transactions:', err);
+            throw err;
+        }
+    },
 
-function findTransactionById(id,callback){
-    var mysql = `SELECT * FROM transactions WHERE id = ${id}`;
-    con.query(mysql, function(err,result){
-        if (err) throw err;
-        console.log(`retrieving transactions with id ${id}`);
-        return(callback(result));
-    }) 
-}
+    deleteAllTransactions: async (callback) => {
+        try {
+            await pool.query('DELETE FROM transactions');
+            callback(true);
+        } catch (err) {
+            console.error('Error deleting all transactions:', err);
+            throw err;
+        }
+    },
 
-function deleteAllTransactions(callback){
-    var mysql = "DELETE FROM transactions";
-    con.query(mysql, function(err,result){
-        if (err) throw err;
-        console.log("Deleting all transactions...");
-        return(callback(result));
-    }) 
-}
+    deleteTransactionById: async (id, callback) => {
+        try {
+            await pool.query('DELETE FROM transactions WHERE id = $1', [id]);
+            callback(true);
+        } catch (err) {
+            console.error('Error deleting transaction by ID:', err);
+            throw err;
+        }
+    },
 
-function deleteTransactionById(id, callback){
-    var mysql = `DELETE FROM transactions WHERE id = ${id}`;
-    con.query(mysql, function(err,result){
-        if (err) throw err;
-        console.log(`Deleting transactions with id ${id}`);
-        return(callback(result));
-    }) 
-}
-
-
-module.exports = {addTransaction ,getAllTransactions, deleteAllTransactions, deleteAllTransactions, findTransactionById, deleteTransactionById};
-
-
-
-
-
-
-
+    findTransactionById: async (id, callback) => {
+        try {
+            const result = await pool.query('SELECT * FROM transactions WHERE id = $1', [id]);
+            callback(result.rows);
+        } catch (err) {
+            console.error('Error finding transaction by ID:', err);
+            throw err;
+        }
+    }
+};
